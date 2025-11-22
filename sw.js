@@ -1,9 +1,9 @@
 /* sw.js v52-2 */
-const CACHE_VERSION = 'v2-1';
+const CACHE_VERSION = 'v3-2';
 const APP_CACHE = 'horoscope2-' + CACHE_VERSION;
 const ASSETS = [
   '/horoscope-100pct-2/',
-  '/horoscope-100pct-2/index.html?v2-1',
+  '/horoscope-100pct-2/index.html?v3-2',
   '/horoscope-100pct-2/manifest.json',
   '/horoscope-100pct-2/icon-192.png',
   '/horoscope-100pct-2/icon-512.png',
