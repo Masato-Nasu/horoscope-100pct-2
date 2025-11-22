@@ -271,16 +271,19 @@ function planetLongitudeDeg(jd, name){
 
 async function fetchNewsAndSeasonContext(dateStr){
   const d=new Date(dateStr+'T12:00:00');
-  const bt=$('birthTime')?.value||'00:00'; const [hh,mm]=(bt||'00:00').split(':').map(v=>parseInt(v||'0',10));
+  const bt=$('birthTime')?.value||'00:00';
+  const [hh,mm]=(bt||'00:00').split(':').map(v=>parseInt(v||'0',10));
   d.setMinutes(d.getMinutes()+hh*60+mm - 12*60);
   const season=seasonToneByMonth(d.getMonth()+1);
-  const ang=sunMoonElongationDeg(d);
-  const star=`☆ 星の角度：太陽-月 ≈ ${Math.round(ang)}°（${aspectName(ang)}）`;
   const news=await fetchNewsTopJP();
-  let line=`今日の空気感：${season}。<br><span class="muted">${star}</span>`;
-  if(news.length){ const safe=news.map(s=>s.replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))); line+=`<br><span class="muted">🗞️ 最近の話題：${safe.join(' ／ ')}。</span>`; }
+  let line=`今日の空気感：${season}。`;
+  if(news.length){
+    const safe=news.map(s=>s.replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]||m)));
+    line+=`<br><span class="muted">🗞️ 最近の話題：${safe.join(' ／ ')}。</span>`;
+  }
   return line;
 }
+
 
 function circDist(a,b){ return Math.abs(((a-b)%360+540)%360-180); }
 function angleBaseScore(angle){
@@ -355,20 +358,57 @@ function composePartsWithRng(topic, rng){
   return { line:`${a}${b}${c}`, a, b, c };
 }
 
-function composeLineWithRng(topic, rng, avoidA=null, avoidB=null, avoidLine=null, maxOverlap=0.35){
+// --- 高度版：a/b/c被り回避 + キーワード重複率回避 ---
+function extractKeywordsJP(text){
+  const raw = (text || "")
+    .replace(/[0-9０-９]/g, "")
+    .match(/[一-龠々〆ヵヶぁ-んァ-ヴー]{2,}/g) || [];
+
+  const stop = new Set([
+    "今日","少し","一つ","また","よう","ため","無理","大事","大丈夫",
+    "気持ち","自分","相手","時間","感じ","意識","良い","大切","必要"
+  ]);
+
+  return raw.filter(w => !stop.has(w));
+}
+
+function keywordOverlapRate(line1, line2){
+  const k1 = new Set(extractKeywordsJP(line1));
+  const k2 = new Set(extractKeywordsJP(line2));
+  if(k1.size === 0 && k2.size === 0) return 0;
+
+  let inter = 0;
+  for(const w of k1) if(k2.has(w)) inter++;
+
+  const uni = k1.size + k2.size - inter;
+  return uni === 0 ? 0 : inter / uni;
+}
+
+function composePartsWithRng(topic, rng){
+  const bank = BANK[topic];
+  if(!bank) return { line:"", a:"", b:"", c:"" };
+
+  const a = bank.a[Math.floor(rng()*bank.a.length)];
+  const b = bank.b[Math.floor(rng()*bank.b.length)];
+  const c = bank.c[Math.floor(rng()*bank.c.length)];
+  return { line:`${a}${b}${c}`, a, b, c };
+}
+
+function composeLineWithRng(topic, rng, avoidA=null, avoidB=null, avoidC=null, avoidLine=null, maxOverlap=0.30){
   const bank = BANK[topic];
   if(!bank) return { line:"", a:"", b:"", c:"" };
 
   let guard = 0;
   let p = composePartsWithRng(topic, rng);
 
-  while(guard < 12){
+  while(guard < 16){
     const aOK = (avoidA === null) || (p.a !== avoidA);
     const bOK = (avoidB === null) || (p.b !== avoidB);
+    const cOK = (avoidC === null) || (p.c !== avoidC);
     const lineOK = (avoidLine === null) || (p.line !== avoidLine);
     const overlapOK = (avoidLine === null) || (keywordOverlapRate(p.line, avoidLine) <= maxOverlap);
 
-    if(aOK && bOK && lineOK && overlapOK) break;
+    if(aOK && bOK && cOK && lineOK && overlapOK) break;
 
     p = composePartsWithRng(topic, rng);
     guard++;
@@ -384,10 +424,11 @@ function uniqueTwoLines(topic, seedStr){
 
   const p1 = composeLineWithRng(topic, rng1);
 
-  let p2 = composeLineWithRng(topic, rng2, p1.a, p1.b, p1.line, 0.35);
+  // 2本目は a/b/c＋全文＋キーワード重複をすべて抑制
+  let p2 = composeLineWithRng(topic, rng2, p1.a, p1.b, p1.c, p1.line, 0.28);
 
-  if(keywordOverlapRate(p1.line, p2.line) > 0.35){
-    p2 = composeLineWithRng(topic, rng3, p1.a, p1.b, p1.line, 0.30);
+  if(keywordOverlapRate(p1.line, p2.line) > 0.28){
+    p2 = composeLineWithRng(topic, rng3, p1.a, p1.b, p1.c, p1.line, 0.24);
   }
 
   if(p2.line === p1.line){
@@ -399,6 +440,9 @@ function uniqueTwoLines(topic, seedStr){
 
   return [p1.line, p2.line];
 }
+
+
+
 
 
 async function runHoroscope(){
@@ -452,6 +496,10 @@ const isTodayBirthday = ((today.getMonth()+1) === bm && today.getDate() === bd2)
   const angleResult = computeAngleOnlyScore(planets);
   const base = angleResult.score;
 
+  // 単純な太陽-月の角度
+  const ang = sunMoonElongationDeg(dForAngle);
+  const starSimple = `☆ 星の角度：太陽-月 ≈ ${Math.round(ang)}°（${aspectName(ang)}）`;
+
   // 星の角度の簡単な解説（総合スコア＋調和/緊張）
   const tone =
     angleResult.globalPower > 0.35 ? "調和優勢" :
@@ -460,6 +508,8 @@ const isTodayBirthday = ((today.getMonth()+1) === bm && today.getDate() === bd2)
   const starDetail =
     `☆ 星の角度（天体総合）：${angleResult.score}%（${tone}／調和${angleResult.harmonyScore}・緊張${angleResult.tensionScore}）`;
 
+  // 今日の空気感＋最近の話題 のあとに、星の角度を２つ並べて表示
+  ctx.seasonNews += `<br><span class="muted">${starSimple}</span>`;
   ctx.seasonNews += `<br><span class="muted">${starDetail}</span>`;
 
   const topics=['全体運','恋愛','仕事','金運','健康'];
