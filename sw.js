@@ -1,5 +1,5 @@
 /* sw.js v52-2 */
-const CACHE_VERSION = 'v3-6';
+const CACHE_VERSION = 'v3-7';
 const APP_CACHE = 'horoscope-' + CACHE_VERSION;
 const ASSETS = [
   '/horoscope-100pct-2/',
