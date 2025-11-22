@@ -1,6 +1,6 @@
 {
   "name": "100% 星占い 2",
-  "short_name": "星占い2",
+  "short_name": "100% HOROSCOPE",
   "start_url": "/horoscope-100pct-2/",
   "scope": "/horoscope-100pct-2/",
   "display": "standalone",
@@ -21,6 +21,11 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    },
+    {
+      "src": "/horoscope-100pct-2/icon-180.png",
+      "sizes": "180x180",
+      "type": "image/png"
     }
   ]
 }

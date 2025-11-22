@@ -6,7 +6,7 @@
 <title>100% 星占い 2</title>
 <meta name="theme-color" content="#060812">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="apple-touch-icon" href="/horoscope-100pct-2/icon-180.png">
 <link rel="manifest" href="/horoscope-100pct-2/manifest.json">
@@ -134,123 +134,6 @@ function moonLongitudeDeg(jd){
     +0.041*Math.sin(M - Mp);
   return norm360(lon);
 }
-
-// ===== Angle-Only Hardcore Engine (Multi-Planet) v3-3 =====
-const ASPECTS = [
-  { name:"Conjunction", angle:0,   orb:8,   impact:+0.60 },
-  { name:"Semi-sextile",angle:30,  orb:2,   impact:+0.20 },
-  { name:"Decile",      angle:36,  orb:1.5, impact:+0.15 },
-  { name:"Semi-square", angle:45,  orb:3,   impact:-0.30 },
-  { name:"Sextile",     angle:60,  orb:4,   impact:+0.45 },
-  { name:"Quintile",    angle:72,  orb:2.5, impact:+0.35 },
-  { name:"Square",      angle:90,  orb:6,   impact:-0.60 },
-  { name:"Tri-decile",  angle:108, orb:2.5, impact:+0.25 },
-  { name:"Trine",       angle:120, orb:6,   impact:+0.70 },
-  { name:"Sesqui-square",angle:135,orb:3.5, impact:-0.40 },
-  { name:"Bi-quintile", angle:144, orb:2.5, impact:+0.30 },
-  { name:"Quincunx",    angle:150, orb:3.5, impact:-0.20 },
-  { name:"Opposition",  angle:180, orb:8,   impact:-0.70 }
-];
-
-function normalizeAngleDiff(lon1Deg, lon2Deg){
-  let diff = Math.abs(lon1Deg - lon2Deg) % 360;
-  if(diff > 180) diff = 360 - diff;
-  return diff;
-}
-
-function aspectWeight(angleDeg, aspectAngle, orbDeg){
-  const diff = Math.abs(angleDeg - aspectAngle);
-  if(diff > orbDeg) return 0;
-  const x = diff / orbDeg;
-  return 1 - x*x;
-}
-
-function computeAspectPowerForAngle(angleDeg){
-  let sum=0, total=0;
-  for(const asp of ASPECTS){
-    const w = aspectWeight(angleDeg, asp.angle, asp.orb);
-    if(w <= 0) continue;
-    sum += asp.impact * w;
-    total += Math.abs(asp.impact) * w;
-  }
-  if(total === 0) return 0;
-  return sum / total;
-}
-
-function computeAngleOnlyScore(planets){
-  const n = planets.length;
-  if(n < 2) return {score:50, harmonyScore:0, tensionScore:0, globalPower:0};
-  let allSum=0, allW=0, posSum=0, posW=0, negSum=0, negW=0;
-  for(let i=0;i<n;i++){
-    for(let j=i+1;j<n;j++){
-      const p1=planets[i], p2=planets[j];
-      const ang = normalizeAngleDiff(p1.lonDeg, p2.lonDeg);
-      const power = computeAspectPowerForAngle(ang);
-      const pairW = p1.weight * p2.weight;
-      const contrib = power * pairW;
-      allSum += contrib; allW += pairW;
-      if(power > 0){ posSum += power*pairW; posW += pairW; }
-      else if(power < 0){ negSum += (-power)*pairW; negW += pairW; }
-    }
-  }
-  const globalPower = allW ? allSum/allW : 0;
-  const harmonyIdx = posW ? posSum/posW : 0;
-  const tensionIdx = negW ? negSum/negW : 0;
-  const CENTER=50, SPREAD=45;
-  let score = Math.round(CENTER + globalPower*SPREAD);
-  score = Math.max(0, Math.min(100, score));
-  return {
-    score,
-    harmonyScore: Math.round(harmonyIdx*100),
-    tensionScore: Math.round(tensionIdx*100),
-    globalPower
-  };
-}
-
-// ===== Simplified planetary longitudes (low-precision) =====
-function planetLongitudeDeg(jd, name){
-  const d = jd - 2451545.0;
-  const rad = Math.PI/180;
-  function norm360(x){ x%=360; if(x<0) x+=360; return x; }
-  function kepler(M,e){
-    let E = M*rad;
-    for(let k=0;k<6;k++){
-      E = E - (E - e*Math.sin(E) - M*rad)/(1 - e*Math.cos(E));
-    }
-    return E;
-  }
-  let N,i,w,a,e,M;
-  switch(name){
-    case "Mercury":
-      N = 48.3313 + 3.24587E-5*d; i = 7.0047 + 5.00E-8*d; w = 29.1241 + 1.01444E-5*d;
-      a = 0.387098; e = 0.205635 + 5.59E-10*d; M = 168.6562 + 4.0923344368*d; break;
-    case "Venus":
-      N = 76.6799 + 2.46590E-5*d; i = 3.3946 + 2.75E-8*d; w = 54.8910 + 1.38374E-5*d;
-      a = 0.723330; e = 0.006773 - 1.302E-9*d; M = 48.0052 + 1.6021302244*d; break;
-    case "Mars":
-      N = 49.5574 + 2.11081E-5*d; i = 1.8497 - 1.78E-8*d; w = 286.5016 + 2.92961E-5*d;
-      a = 1.523688; e = 0.093405 + 2.516E-9*d; M = 18.6021 + 0.5240207766*d; break;
-    case "Jupiter":
-      N = 100.4542 + 2.76854E-5*d; i = 1.3030 - 1.557E-7*d; w = 273.8777 + 1.64505E-5*d;
-      a = 5.20256; e = 0.048498 + 4.469E-9*d; M = 19.8950 + 0.0830853001*d; break;
-    case "Saturn":
-      N = 113.6634 + 2.38980E-5*d; i = 2.4886 - 1.081E-7*d; w = 339.3939 + 2.97661E-5*d;
-      a = 9.55475; e = 0.055546 - 9.499E-9*d; M = 316.9670 + 0.0334442282*d; break;
-    default: return 0;
-  }
-  N=norm360(N); i=norm360(i); w=norm360(w); M=norm360(M);
-  const E = kepler(M,e);
-  const xv = a*(Math.cos(E)-e);
-  const yv = a*(Math.sqrt(1-e*e)*Math.sin(E));
-  const v  = Math.atan2(yv,xv)/rad;
-  const r  = Math.sqrt(xv*xv+yv*yv);
-  const xh = r*(Math.cos(N*rad)*Math.cos((v+w)*rad) - Math.sin(N*rad)*Math.sin((v+w)*rad)*Math.cos(i*rad));
-  const yh = r*(Math.sin(N*rad)*Math.cos((v+w)*rad) + Math.cos(N*rad)*Math.sin((v+w)*rad)*Math.cos(i*rad));
-  const lon = Math.atan2(yh,xh)/rad;
-  return norm360(lon);
-}
-
-
 function sunMoonElongationDeg(date){ const jd=toJD(date); return norm360(moonLongitudeDeg(jd)-sunLongitudeDeg(jd)); }
 function aspectName(a){a=((a%360)+360)%360; const eps=15;
   if(Math.abs(a-0)<=eps||Math.abs(a-360)<=eps)return'新月付近';
@@ -259,19 +142,140 @@ function aspectName(a){a=((a%360)+360)%360; const eps=15;
   if(Math.abs(a-270)<=eps)return'下弦付近';
   if(a<90)return'成長の相'; if(a<180)return'熟成の相'; if(a<270)return'収穫の相'; return'内省の相';
 }
+
+// ===== Angle-Only Hardcore Engine (Multi-Planet) v3-5 =====
+const ASPECTS = [
+  { name:"Conjunction",   angle:  0, orb: 8,   impact: +0.60 },
+  { name:"Semi-sextile",  angle: 30, orb: 2,   impact: +0.20 },
+  { name:"Decile",        angle: 36, orb: 1.5, impact: +0.15 },
+  { name:"Semi-square",   angle: 45, orb: 3,   impact: -0.30 },
+  { name:"Sextile",       angle: 60, orb: 4,   impact: +0.45 },
+  { name:"Quintile",      angle: 72, orb: 2.5, impact: +0.35 },
+  { name:"Square",        angle: 90, orb: 6,   impact: -0.60 },
+  { name:"Tri-decile",    angle:108, orb: 2.5, impact: +0.25 },
+  { name:"Trine",         angle:120, orb: 6,   impact: +0.70 },
+  { name:"Sesqui-square", angle:135, orb: 3.5, impact: -0.40 },
+  { name:"Bi-quintile",   angle:144, orb: 2.5, impact: +0.30 },
+  { name:"Quincunx",      angle:150, orb: 3.5, impact: -0.20 },
+  { name:"Opposition",    angle:180, orb: 8,   impact: -0.70 }
+];
+
+function normalizeAngleDiff(lon1Deg, lon2Deg){
+  let diff = Math.abs(lon1Deg - lon2Deg) % 360;
+  if (diff > 180) diff = 360 - diff;
+  return diff;
+}
+
+function aspectWeight(angleDeg, aspectAngle, orbDeg){
+  const diff = Math.abs(angleDeg - aspectAngle);
+  if (diff > orbDeg) return 0;
+  const x = diff / orbDeg;
+  return 1 - x * x;
+}
+
+function computeAspectPowerForAngle(angleDeg){
+  let sum = 0, total = 0;
+  for (const asp of ASPECTS){
+    const w = aspectWeight(angleDeg, asp.angle, asp.orb);
+    if (w <= 0) continue;
+    sum   += asp.impact * w;
+    total += Math.abs(asp.impact) * w;
+  }
+  if (!total) return 0;
+  return sum / total;
+}
+
+function computeAngleOnlyScore(planets){
+  const n = planets.length;
+  if (n < 2) return { score:50, harmonyScore:0, tensionScore:0, globalPower:0 };
+
+  let allSum=0, allW=0, posSum=0, posW=0, negSum=0, negW=0;
+  for (let i=0;i<n;i++){
+    for (let j=i+1;j<n;j++){
+      const p1 = planets[i], p2 = planets[j];
+      const ang = normalizeAngleDiff(p1.lonDeg, p2.lonDeg);
+      const power = computeAspectPowerForAngle(ang);
+      const w = p1.weight * p2.weight;
+      const contrib = power * w;
+      allSum += contrib; allW += w;
+      if (power > 0){ posSum += power*w; posW += w; }
+      else if (power < 0){ negSum += (-power)*w; negW += w; }
+    }
+  }
+
+  const globalPower = allW ? allSum / allW : 0;
+  const harmonyIdx  = posW ?  posSum / posW : 0;
+  const tensionIdx  = negW ?  negSum / negW : 0;
+
+  const CENTER = 50, SPREAD = 45;
+  let score = Math.round(CENTER + globalPower * SPREAD);
+  score = Math.max(0, Math.min(100, score));
+
+  return {
+    score,
+    harmonyScore: Math.round(harmonyIdx*100),
+    tensionScore: Math.round(tensionIdx*100),
+    globalPower
+  };
+}
+
+// Low-precision ecliptic longitudes for inner planets (Mercury~Saturn)
+// Based on simple orbital elements;十分"占い用途"レベルの近似。
+function planetLongitudeDeg(jd, name){
+  const d = jd - 2451545.0;
+  const rad = Math.PI / 180;
+  function norm(x){ x%=360; if (x<0) x+=360; return x; }
+  function kepler(Mdeg, e){
+    let M = Mdeg * rad;
+    let E = M;
+    for (let k=0;k<6;k++){
+      E = E - (E - e*Math.sin(E) - M)/(1 - e*Math.cos(E));
+    }
+    return E;
+  }
+
+  let N,i,w,a,e,M;
+  switch(name){
+    case "Mercury":
+      N = 48.3313 + 3.24587E-5*d;  i = 7.0047 + 5.00E-8*d;  w = 29.1241 + 1.01444E-5*d;
+      a = 0.387098; e = 0.205635 + 5.59E-10*d; M = 168.6562 + 4.0923344368*d; break;
+    case "Venus":
+      N = 76.6799 + 2.46590E-5*d;  i = 3.3946 + 2.75E-8*d;  w = 54.8910 + 1.38374E-5*d;
+      a = 0.723330; e = 0.006773 - 1.302E-9*d; M = 48.0052 + 1.6021302244*d; break;
+    case "Mars":
+      N = 49.5574 + 2.11081E-5*d;  i = 1.8497 - 1.78E-8*d;   w = 286.5016 + 2.92961E-5*d;
+      a = 1.523688; e = 0.093405 + 2.516E-9*d; M = 18.6021 + 0.5240207766*d; break;
+    case "Jupiter":
+      N = 100.4542 + 2.76854E-5*d; i = 1.3030 - 1.557E-7*d;  w = 273.8777 + 1.64505E-5*d;
+      a = 5.20256; e = 0.048498 + 4.469E-9*d; M = 19.8950 + 0.0830853001*d; break;
+    case "Saturn":
+      N = 113.6634 + 2.38980E-5*d; i = 2.4886 - 1.081E-7*d;  w = 339.3939 + 2.97661E-5*d;
+      a = 9.55475; e = 0.055546 - 9.499E-9*d; M = 316.9670 + 0.0334442282*d; break;
+    default:
+      return 0;
+  }
+
+  N = norm(N); i = norm(i); w = norm(w); M = norm(M);
+  const E = kepler(M, e);
+  const xv = a*(Math.cos(E) - e);
+  const yv = a*(Math.sqrt(1-e*e)*Math.sin(E));
+  const v  = Math.atan2(yv, xv) / rad;
+  const r  = Math.sqrt(xv*xv + yv*yv);
+  const lon = Math.atan2(
+    Math.sin((N*rad)) * Math.cos((v+w)*rad) + Math.cos((N*rad)) * Math.sin((v+w)*rad) * Math.cos(i*rad),
+    Math.cos((N*rad)) * Math.cos((v+w)*rad) - Math.sin((N*rad)) * Math.sin((v+w)*rad) * Math.cos(i*rad)
+  ) / rad;
+
+  return norm(lon);
+}
+
 async function fetchNewsAndSeasonContext(dateStr){
   const d=new Date(dateStr+'T12:00:00');
   const bt=$('birthTime')?.value||'00:00'; const [hh,mm]=(bt||'00:00').split(':').map(v=>parseInt(v||'0',10));
   d.setMinutes(d.getMinutes()+hh*60+mm - 12*60);
   const season=seasonToneByMonth(d.getMonth()+1);
   const ang=sunMoonElongationDeg(d);
-  const tone =
-    angleResult.globalPower > 0.35 ? "調和優勢" :
-    angleResult.globalPower < -0.35 ? "緊張優勢" : "中庸";
-
-  const star =
-    `☆ 星の角度：天体総合 ${angleResult.score}%（${tone}／調和${angleResult.harmonyScore}・緊張${angleResult.tensionScore}）`
-    + ` ／ 太陽-月 ≈ ${Math.round(ang)}°（${aspectName(ang)}）`;
+  const star=`☆ 星の角度：太陽-月 ≈ ${Math.round(ang)}°（${aspectName(ang)}）`;
   const news=await fetchNewsTopJP();
   let line=`今日の空気感：${season}。<br><span class="muted">${star}</span>`;
   if(news.length){ const safe=news.map(s=>s.replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))); line+=`<br><span class="muted">🗞️ 最近の話題：${safe.join(' ／ ')}。</span>`; }
@@ -424,25 +428,39 @@ const isTodayBirthday = ((today.getMonth()+1) === bm && today.getDate() === bd2)
 
   const ctx={}; ctx.seasonNews=await fetchNewsAndSeasonContext(dateStr);
 
-  const ang=sunMoonElongationDeg(sunLon, moonLon);
-  const mercLon = planetLongitudeDeg(jd, "Mercury");
+  // --- Multi-planet angle-only engine ---
+  const dForAngle = new Date(dateStr+'T12:00:00');
+  const jd = toJD(dForAngle);
+  const sunLon   = sunLongitudeDeg(jd);
+  const moonLon  = moonLongitudeDeg(jd);
+  const mercLon  = planetLongitudeDeg(jd, "Mercury");
   const venusLon = planetLongitudeDeg(jd, "Venus");
-  const marsLon = planetLongitudeDeg(jd, "Mars");
-  const jupiterLon = planetLongitudeDeg(jd, "Jupiter");
-  const saturnLon = planetLongitudeDeg(jd, "Saturn");
+  const marsLon  = planetLongitudeDeg(jd, "Mars");
+  const jupLon   = planetLongitudeDeg(jd, "Jupiter");
+  const satLon   = planetLongitudeDeg(jd, "Saturn");
 
   const planets = [
-    { name:"Sun", lonDeg:sunLon, weight:1.0 },
-    { name:"Moon", lonDeg:moonLon, weight:1.0 },
-    { name:"Mercury", lonDeg:mercLon, weight:0.6 },
-    { name:"Venus", lonDeg:venusLon, weight:0.8 },
-    { name:"Mars", lonDeg:marsLon, weight:0.8 },
-    { name:"Jupiter", lonDeg:jupiterLon, weight:0.7 },
-    { name:"Saturn", lonDeg:saturnLon, weight:0.7 }
+    { name:"Sun",     lonDeg:sunLon,   weight:1.0 },
+    { name:"Moon",    lonDeg:moonLon,  weight:1.0 },
+    { name:"Mercury", lonDeg:mercLon,  weight:0.6 },
+    { name:"Venus",   lonDeg:venusLon, weight:0.8 },
+    { name:"Mars",    lonDeg:marsLon,  weight:0.8 },
+    { name:"Jupiter", lonDeg:jupLon,   weight:0.7 },
+    { name:"Saturn",  lonDeg:satLon,   weight:0.7 }
   ];
 
   const angleResult = computeAngleOnlyScore(planets);
   const base = angleResult.score;
+
+  // 星の角度の簡単な解説（総合スコア＋調和/緊張）
+  const tone =
+    angleResult.globalPower > 0.35 ? "調和優勢" :
+    angleResult.globalPower < -0.35 ? "緊張優勢" : "中庸";
+
+  const starDetail =
+    `☆ 星の角度（天体総合）：${angleResult.score}%（${tone}／調和${angleResult.harmonyScore}・緊張${angleResult.tensionScore}）`;
+
+  ctx.seasonNews += `<br><span class="muted">${starDetail}</span>`;
 
   const topics=['全体運','恋愛','仕事','金運','健康'];
   const perTopic=2;
