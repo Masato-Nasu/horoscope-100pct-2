@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+<title>100% 星占い 2</title>
+<meta name="theme-color" content="#060812">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="/horoscope-100pct-2/icon-192.png">
+<link rel="manifest" href="/horoscope-100pct-2/manifest.json">
+
+<!-- v52.1 -->
+<link rel="icon" href="/horoscope-100pct-2/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/horoscope-100pct-2/splash.css" as="style">
+<link rel="stylesheet" href="/horoscope-100pct-2/splash.css">
+<script defer src="/horoscope-100pct-2/splash.js"></script>
+
+<style>
+body{font-family:'Noto Sans JP',system-ui,-apple-system,sans-serif;background:#fafafa;color:#222;margin:0;text-align:center}
+header{background:#060812;color:#fff;padding:1.2em 0;font-weight:700;font-size:1.3em}
+main{padding:1.2em;max-width:720px;margin:0 auto}
+input,button{font:inherit;padding:.6em;border-radius:.6em;border:1px solid #ccc;box-sizing:border-box;width:100%}
+button{background:#060812;color:#fff;border:none;cursor:pointer} button:hover{opacity:.9}
+.card{background:#fff;border-radius:1em;box-shadow:0 2px 8px rgba(0,0,0,.08);padding:1.1em;margin-top:1em;text-align:left}
+.muted{color:#666;font-size:.9em}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:10px 16px;border-radius:999px;opacity:0;transition:opacity .25s}
+.toast.show{opacity:1}
+#outputArea button{margin-top:12px} #outputArea button+button{margin-top:12px}
+.card .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:space-between}
+.card .title{font-weight:700}
+.score{display:flex;align-items:center;gap:8px;min-width:180px;margin-left:auto}
+.bar{position:relative;flex:1;height:8px;background:#eee;border-radius:999px;overflow:hidden}
+.bar-fill{position:absolute;inset:0 100% 0 0;background:#060812;border-radius:999px;transition:width .6s ease}
+.pct{font-weight:700;color:#8b92e8;min-width:3ch;text-align:right}
+.card.birthday{border:2px solid #f5b5d5}
+#confettiCanvas{position:fixed;inset:0;pointer-events:none;z-index:9999}
+</style>
+</head>
+<body>
+<!-- Splash overlay (v49) -->
+<div id="app-splash" role="status" aria-live="polite">
+  <img class="logo" src="/horoscope-100pct-2/icon-192.png" alt="">
+  <div class="title">100% 星占い 2</div>
+  <div class="sub">Starting…</div>
+</div>
+
+<header>100% 星占い 2</header>
+<main>
+<section id="inputArea">
+  <h2>あなたの情報を入力</h2>
+  <label>生年月日</label><input type="date" id="birthDate"><br><br>
+  <label>出生時刻（任意）</label><input type="time" id="birthTime" step="60"><br><br>
+  <label>占いたい日（省略可）</label><input type="date" id="targetDate"><br><br>
+  <label>出生都市名</label><input type="text" id="placeName" placeholder="Tokyo"><br><br>
+  <button id="geoBtn" type="button">都市名から取得</button><br><br>
+  <label>緯度</label><input type="text" id="lat" placeholder="35.6895"><br><br>
+  <label>経度</label><input type="text" id="lon" placeholder="139.6917"><br><br>
+  <button id="runBtn" type="button">結果を見る</button>
+</section>
+
+<section id="outputArea" style="display:none;">
+  <h2>結果</h2>
+  <div id="resultContainer"></div>
+  <button id="saveBtn" type="button">JPEG保存</button>
+  <button id="backBtn" type="button">戻る</button>
+</section>
+</main>
+
+<canvas id="confettiCanvas" style="display:none;"></canvas>
+<div class="toast" id="toast"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+function toast(m){const t=$('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1400);}
+function escapeHtml(s){return String(s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));}
+function saveInputs(){const d={birthDate:$('birthDate').value||'',birthTime:$('birthTime').value||'',targetDate:$('targetDate').value||'',placeName:$('placeName').value||'',lat:$('lat').value||'',lon:$('lon').value||''}; localStorage.setItem('horo.inputs',JSON.stringify(d));}
+function loadInputs(){try{const d=JSON.parse(localStorage.getItem('horo.inputs')||'{}'); for(const k in d){if($(k)) $(k).value=d[k];}}catch{}}
+function seasonToneByMonth(m){if([12,1,2].includes(m))return'静かな冬、足元を固めるとき'; if([3,4,5].includes(m))return'芽吹く春、動き出しに追い風'; if([6,7,8].includes(m))return'輝く夏、勢いと発信が効く'; if([9,10,11].includes(m))return'実りの秋、仕上げと整えが吉'; return'季節のリズムに乗ると良い日';}
+
+function snapToPresetIfAlias(q){ if(!q) return null; const s=String(q).toLowerCase().trim(); if(['tokyo','tokyo japan','東京','とうきょう'].includes(s)) return {lat:'35.6895',lon:'139.6917'}; return null; }
+function haversine(a,b,c,d){const R=6371,toRad=x=>x*Math.PI/180; const dLat=toRad(c-a), dLon=toRad(d-b); const A=Math.sin(dLat/2)**2+Math.cos(toRad(a))*Math.cos(toRad(c))*Math.sin(dLon/2)**2; return 2*R*Math.asin(Math.sqrt(A));}
+function snapNearPreset(lat,lon,km=15){const tLat=35.6895,tLon=139.6917; const dist=haversine(+lat,+lon,tLat,tLon); if(dist<=km) return {lat:String(tLat),lon:String(tLon)}; return null;}
+
+const GNEWS_API_KEY="0e21cddc975f5f620c1431fde88db5fe";
+async function fetchNewsTopJP(){
+  try{
+    const url=`https://gnews.io/api/v4/top-headlines?lang=ja&country=jp&max=3&category=general&apikey=${GNEWS_API_KEY}`;
+    const r=await fetch(url,{headers:{'Accept':'application/json'},cache:'no-store'});
+    if(!r.ok) throw new Error('GNews HTTP '+r.status);
+    const j=await r.json();
+    const t=(j?.articles||[]).map(a=>a?.title).filter(Boolean).slice(0,2);
+    if(t.length) return t;
+  }catch(e){}
+  try{
+    const rss='https://www3.nhk.or.jp/rss/news/cat0.xml';
+    const r=await fetch(rss,{cache:'no-store'}); if(!r.ok) throw new Error('NHK RSS HTTP '+r.status);
+    const x=await r.text(); const doc=new DOMParser().parseFromString(x,'application/xml');
+    return Array.from(doc.querySelectorAll('item>title')).map(n=>(n.textContent||'').trim()).filter(Boolean).slice(0,2);
+  }catch(e){return []}
+}
+
+const d2r=d=>d*Math.PI/180, norm360=d=>((d%360)+360)%360;
+function toJD(date){ return date.getTime()/86400000 + 2440587.5; }
+function sunLongitudeDeg(jd){
+  const T=(jd-2451545.0)/36525;
+  const L0=norm360(280.46646+36000.76983*T+0.0003032*T*T);
+  const M =norm360(357.52911+35999.05029*T-0.0001537*T*T);
+  const Mr=d2r(M);
+  const C =(1.914602-0.004817*T-0.000014*T*T)*Math.sin(Mr)
+         +(0.019993-0.000101*T)*Math.sin(2*Mr)
+         +0.000289*Math.sin(3*Mr);
+  return norm360(L0+C);
+}
+function moonLongitudeDeg(jd){
+  const T=(jd-2451545.0)/36525;
+  const Lp=norm360(218.3164477+481267.88123421*T-0.0015786*T*T+T*T*T/538841 - T*T*T*T/65194000);
+  const D =norm360(297.8501921+445267.1114034*T -0.0018819*T*T+T*T*T/545868 - T*T*T*T/113065000);
+  const M =norm360(357.5291092+35999.0502909*T -0.0001536*T*T+T*T*T/24490000);
+  const Mp=norm360(134.9633964+477198.8675055*T +0.0087414*T*T+T*T*T/69699  - T*T*T*T/14712000);
+  const Dr=d2r(D), Mr=d2r(M), Mpr=d2r(Mp);
+  let lon=Lp
+    +6.289*Math.sin(Mpr)
+    +1.274*Math.sin(2*Dr - Mpr)
+    +0.658*Math.sin(2*Dr)
+    +0.214*Math.sin(2*Mpr)
+    +0.110*Math.sin(Dr)
+    -0.186*Math.sin(Mr)
+    -0.059*Math.sin(2*Dr - 2*Mpr)
+    -0.057*Math.sin(2*Dr - Mr - Mpr)
+    +0.053*Math.sin(2*Dr + Mpr)
+    +0.046*Math.sin(2*Dr - Mr)
+    +0.041*Math.sin(M - Mp);
+  return norm360(lon);
+}
+
+// ===== Angle-Only Hardcore Engine (Multi-Planet) v2-1 =====
+const ASPECTS = [
+  { name:"Conjunction", angle:0,   orb:8,   impact:+0.60 },
+  { name:"Semi-sextile",angle:30,  orb:2,   impact:+0.20 },
+  { name:"Decile",      angle:36,  orb:1.5, impact:+0.15 },
+  { name:"Semi-square", angle:45,  orb:3,   impact:-0.30 },
+  { name:"Sextile",     angle:60,  orb:4,   impact:+0.45 },
+  { name:"Quintile",    angle:72,  orb:2.5, impact:+0.35 },
+  { name:"Square",      angle:90,  orb:6,   impact:-0.60 },
+  { name:"Tri-decile",  angle:108, orb:2.5, impact:+0.25 },
+  { name:"Trine",       angle:120, orb:6,   impact:+0.70 },
+  { name:"Sesqui-square",angle:135,orb:3.5, impact:-0.40 },
+  { name:"Bi-quintile", angle:144, orb:2.5, impact:+0.30 },
+  { name:"Quincunx",    angle:150, orb:3.5, impact:-0.20 },
+  { name:"Opposition",  angle:180, orb:8,   impact:-0.70 }
+];
+
+function normalizeAngleDiff(lon1Deg, lon2Deg){
+  let diff = Math.abs(lon1Deg - lon2Deg) % 360;
+  if(diff > 180) diff = 360 - diff;
+  return diff;
+}
+
+function aspectWeight(angleDeg, aspectAngle, orbDeg){
+  const diff = Math.abs(angleDeg - aspectAngle);
+  if(diff > orbDeg) return 0;
+  const x = diff / orbDeg;
+  return 1 - x*x;
+}
+
+function computeAspectPowerForAngle(angleDeg){
+  let sum=0, total=0;
+  for(const asp of ASPECTS){
+    const w = aspectWeight(angleDeg, asp.angle, asp.orb);
+    if(w <= 0) continue;
+    sum += asp.impact * w;
+    total += Math.abs(asp.impact) * w;
+  }
+  if(total === 0) return 0;
+  return sum / total;
+}
+
+function computeAngleOnlyScore(planets){
+  const n = planets.length;
+  if(n < 2) return {score:50, harmonyScore:0, tensionScore:0, globalPower:0};
+  let allSum=0, allW=0, posSum=0, posW=0, negSum=0, negW=0;
+  for(let i=0;i<n;i++){
+    for(let j=i+1;j<n;j++){
+      const p1=planets[i], p2=planets[j];
+      const ang = normalizeAngleDiff(p1.lonDeg, p2.lonDeg);
+      const power = computeAspectPowerForAngle(ang);
+      const pairW = p1.weight * p2.weight;
+      const contrib = power * pairW;
+      allSum += contrib; allW += pairW;
+      if(power > 0){ posSum += power*pairW; posW += pairW; }
+      else if(power < 0){ negSum += (-power)*pairW; negW += pairW; }
+    }
+  }
+  const globalPower = allW ? allSum/allW : 0;
+  const harmonyIdx = posW ? posSum/posW : 0;
+  const tensionIdx = negW ? negSum/negW : 0;
+  const CENTER=50, SPREAD=45;
+  let score = Math.round(CENTER + globalPower*SPREAD);
+  score = Math.max(0, Math.min(100, score));
+  return {
+    score,
+    harmonyScore: Math.round(harmonyIdx*100),
+    tensionScore: Math.round(tensionIdx*100),
+    globalPower
+  };
+}
+
+// ===== Simplified planetary longitudes (low-precision) =====
+// Based on low-precision orbital elements (adequate for daily horoscope tone).
+function planetLongitudeDeg(jd, name){
+  const d = jd - 2451545.0; // days since J2000
+  const rad = Math.PI/180;
+  function norm360(x){ x%=360; if(x<0) x+=360; return x; }
+  function kepler(M,e){
+    let E = M*rad;
+    for(let k=0;k<6;k++){
+      E = E - (E - e*Math.sin(E) - M*rad)/(1 - e*Math.cos(E));
+    }
+    return E;
+  }
+  // elements: N, i, w, a, e, M (all in degrees except a,e)
+  let N,i,w,a,e,M;
+  switch(name){
+    case "Mercury":
+      N = 48.3313 + 3.24587E-5*d;
+      i = 7.0047 + 5.00E-8*d;
+      w = 29.1241 + 1.01444E-5*d;
+      a = 0.387098;
+      e = 0.205635 + 5.59E-10*d;
+      M = 168.6562 + 4.0923344368*d;
+      break;
+    case "Venus":
+      N = 76.6799 + 2.46590E-5*d;
+      i = 3.3946 + 2.75E-8*d;
+      w = 54.8910 + 1.38374E-5*d;
+      a = 0.723330;
+      e = 0.006773 - 1.302E-9*d;
+      M = 48.0052 + 1.6021302244*d;
+      break;
+    case "Mars":
+      N = 49.5574 + 2.11081E-5*d;
+      i = 1.8497 - 1.78E-8*d;
+      w = 286.5016 + 2.92961E-5*d;
+      a = 1.523688;
+      e = 0.093405 + 2.516E-9*d;
+      M = 18.6021 + 0.5240207766*d;
+      break;
+    case "Jupiter":
+      N = 100.4542 + 2.76854E-5*d;
+      i = 1.3030 - 1.557E-7*d;
+      w = 273.8777 + 1.64505E-5*d;
+      a = 5.20256;
+      e = 0.048498 + 4.469E-9*d;
+      M = 19.8950 + 0.0830853001*d;
+      break;
+    case "Saturn":
+      N = 113.6634 + 2.38980E-5*d;
+      i = 2.4886 - 1.081E-7*d;
+      w = 339.3939 + 2.97661E-5*d;
+      a = 9.55475;
+      e = 0.055546 - 9.499E-9*d;
+      M = 316.9670 + 0.0334442282*d;
+      break;
+    default:
+      return 0;
+  }
+  N=norm360(N); i=norm360(i); w=norm360(w); M=norm360(M);
+  const E = kepler(M,e);
+  const xv = a*(Math.cos(E)-e);
+  const yv = a*(Math.sqrt(1-e*e)*Math.sin(E));
+  const v  = Math.atan2(yv,xv)/rad;
+  const r  = Math.sqrt(xv*xv+yv*yv);
+  const xh = r*(Math.cos(N*rad)*Math.cos((v+w)*rad) - Math.sin(N*rad)*Math.sin((v+w)*rad)*Math.cos(i*rad));
+  const yh = r*(Math.sin(N*rad)*Math.cos((v+w)*rad) + Math.cos(N*rad)*Math.sin((v+w)*rad)*Math.cos(i*rad));
+  const lon = Math.atan2(yh,xh)/rad;
+  return norm360(lon);
+}
+
+
+function sunMoonElongationDeg(date){ const jd=toJD(date); return norm360(moonLongitudeDeg(jd)-sunLongitudeDeg(jd)); }
+function aspectName(a){a=((a%360)+360)%360; const eps=15;
+  if(Math.abs(a-0)<=eps||Math.abs(a-360)<=eps)return'新月付近';
+  if(Math.abs(a-90)<=eps)return'上弦付近';
+  if(Math.abs(a-180)<=eps)return'満月付近';
+  if(Math.abs(a-270)<=eps)return'下弦付近';
+  if(a<90)return'成長の相'; if(a<180)return'熟成の相'; if(a<270)return'収穫の相'; return'内省の相';
+}
+async function fetchNewsAndSeasonContext(dateStr){
+  const d=new Date(dateStr+'T12:00:00');
+  const bt=$('birthTime')?.value||'00:00'; const [hh,mm]=(bt||'00:00').split(':').map(v=>parseInt(v||'0',10));
+  d.setMinutes(d.getMinutes()+hh*60+mm - 12*60);
+  const season=seasonToneByMonth(d.getMonth()+1);
+  const ang=sunMoonElongationDeg(d);
+  const star=`☆ 星の角度：天体総合（基準）／太陽-月 ≈ ${Math.round(ang)}°（${aspectName(ang)}）`;
+  const news=await fetchNewsTopJP();
+  let line=`今日の空気感：${season}。<br><span class="muted">${star}</span>`;
+  if(news.length){ const safe=news.map(s=>s.replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))); line+=`<br><span class="muted">🗞️ 最近の話題：${safe.join(' ／ ')}。</span>`; }
+  return line;
+}
+
+function circDist(a,b){ return Math.abs(((a-b)%360+540)%360-180); }
+function angleBaseScore(angle){
+  const good=[60,120,240,300], bad=[0,180,270];
+  const dg = Math.min(...good.map(a=>circDist(angle,a)));
+  const db = Math.min(...bad .map(a=>circDist(angle,a)));
+  const gAff = Math.max(0, 1 - dg/40);
+  const bAff = Math.max(0, 1 - db/22);
+  const raw = 0.8*gAff - 1.0*bAff;
+  const k = 2.2;
+  const logistic = 1/(1+Math.exp(-k*raw));
+  let score = Math.round(50 + 35*(logistic-0.5)*2);
+  score = Math.max(5, Math.min(95, score));
+  return score;
+}
+const TOPIC_TWEAK={'全体運':0,'恋愛':3,'仕事':0,'金運':-2,'健康':1};
+
+function stableSeed(str){ let h=0; for(let i=0;i<str.length;i++){ h=(Math.imul(31,h) + str.charCodeAt(i))|0; } return (h>>>0); }
+function makeRng(seed){ let t=seed>>>0; return function(){ t|=0; t=(t+0x6D2B79F5)|0; let r=Math.imul(t ^ (t>>>15), 1|t); r^=r + Math.imul(r ^ (r>>>7), 61|r); return ((r ^ (r>>>14))>>>0) / 4294967296; } }
+
+const BANK={
+  "全体運":{a:["早めの着手が","肩の力を抜くと","一度整えてから","原点に戻ると","小さな一歩が","丁寧な確認が","直感より段取りで","会話の中に","整理整頓が","感謝を行動に","余白を作ると","笑顔で始めると","朝の空気が","歩く速度を落とすと","いい香りが","静かな時間が","記録を残すと","一人時間が","背筋を伸ばすと","深呼吸が"],
+    b:["流れを変える。","運を呼ぶ。","判断を助ける。","迷いをほどく。","午後を支える。","周囲に伝わる。","進みやすい。","ヒントを運ぶ。","頭も整う。","好循環を生む。","余裕を戻す。","ツキを連れてくる。","リズムを整える。","景色が見える。","気分転換に◎。","集中を生む。","次に繋がる。","心を守る。","視界が広がる。","落ち着きを取り戻す。"],
+    c:["焦らず確実に。","まず一つ終わらせよう。","笑顔を忘れずに。","短くメモを。","深呼吸から始めよう。","今日できる分だけで十分。","無理に広げず丁寧に。","人に頼ってOK。","余計な情報は手放して。","朝のうちに要件を。","予定は三つに絞って。","手順を先に決めると◎。","過去に感謝して前へ。","目線を上げて歩こう。","休憩も予定に入れて。","心地よさを選んで正解。","小さな達成を楽しんで。","水分を忘れずに。","静かな場所を選ぼう。","今日は“足し算より整頓”。"]},
+  "恋愛":{a:["挨拶＋一言が","聞き役7割が","相手の予定を先に聞くと","素直な褒め言葉が","身だしなみを整えると","小さな気遣いが","メッセージのタイミングが","共通の話題が","距離を半歩だけ詰めると","目を見て話すと","ありがとうの一言が","ゆっくり話すと","背伸びしない姿勢が","声のトーンを柔らかくすると","冗談より誠実さが","返信は短く明るくが","沈黙を恐れないことが","相手の変化に気づくと","笑顔の写真が","手書きメッセージが"],
+    b:["距離を縮める。","安心感を与える。","誤解を減らす。","好印象につながる。","気持ちを伝える。","空気を和らげる。","すっと届く。","絆を強める。","自然に伝わる。","壁を低くする。","未来のきっかけに。","印象を良くする。","自分らしさを支える。","想いを届ける。","今日の正解。","スムーズ。","心地よい。","大切なサイン。","きっかけを生む。","ぬくもりを添える。"],
+    c:["焦らず今を楽しもう。","予定の共有から始めよう。","返事は急がなくてOK。","短い言葉で十分伝わる。","相手の良い所を一つ見つけて。","無理に盛り上げなくて大丈夫。","会えなくても声を届けて。","感謝の言葉を忘れずに。","一緒に笑える話題を一つ。","今日は背伸びしないで。","不安はそのままにせず相談を。","会うなら昼が吉。","香りや音楽を共有すると◎。","“また今度”を具体化して。","写真より日常の一言を。","会話は質問で終わらせない。","お願いごとはシンプルに。","やさしい否定で境界線を。","深追いしない勇気も愛情。","思い出話より現状を。"]},
+  "仕事":{a:["5分の粗案が","ToDo三つの厳選が","朝一の連絡が","段取りの見直しが","小さな自動化が","過去資料の再利用が","メモとチェックが","報連相の速さが","机の整理が","会議の短縮が","対面での一言が","休憩のタイミングが","締切を前倒しにすることが","前日準備が","手書きスケッチが","依頼の復唱が","優先順位の共有が","試作品づくりが","仮決めが","見える化が"],
+    b:["成果を引き上げる。","集中を長持ちさせる。","進捗を加速する。","ミスを減らす。","評価につながる。","時間を生む。","安心を生む。","チームを強くする。","頭も整える。","意思決定を速くする。","空気を変える。","効率を上げる。","トラブルを避ける。","手戻りを防ぐ。","発想を広げる。","誤解をなくす。","足並みを揃える。","形に近づける。","前に進める。","共有をスムーズにする。"],
+    c:["午前に重い仕事を片づけよう。","メールは短く結論から。","会話は“依頼→期限→形式”で。","チェックリストを使おう。","集中タイムは通知オフで。","今日の成功は数日後に効いてくる。","迷ったら上司に相談を。","資料は一枚に要約する意識で。","席を立って歩くと発想が出る。","会議は30分以内を目指そう。","数字は二人で確認が安全。","疲れたら深呼吸でリセット。","ドラフトで良いから先に出す。","“やらないこと”を決めよう。","締切前倒しで安心をつくる。","複雑なことほど図にして共有。","今日の学びを一行メモに。","小さな改善を一つだけ。","ありがとうを先に言おう。","完璧より着手を。"]},
+  "金運":{a:["固定費の見直しが","財布の整理が","レシートの撮影が","ポイントの確認が","ネット明細のチェックが","買い物メモの作成が","手放す準備が","値段比較が","午前中の支払いが","数字の見える化が","寄付やお礼が","家計アプリ入力が","サブスク点検が","冷蔵庫在庫の確認が","お得情報の収集が","現金とキャッシュレスの使い分けが","欲しい物の“保留”が","中古・リユースの検討が","修理と買い替えの判断が","小銭貯金の継続が"],
+    b:["無駄を減らす。","安心につながる。","管理を楽にする。","得を生む。","失念を防ぐ。","衝動買いを抑える。","金運を巡らせる。","納得感を高める。","心配を減らす。","判断を助ける。","良い循環を作る。","見通しを良くする。","漏れを防ぐ。","無駄買いを防ぐ。","掘り出し物に出会う。","支出の質を上げる。","冷静さを保つ。","手元資金を守る。","長持ちに繋がる。","積み上げになる。"],
+    c:["今日は“買う前に一晩置く”。","欲しい物は“用途→頻度→保管”で考えよう。","ポイントは期限チェックを。","支払いは午前に済ませてスッキリ。","割引より“必要か”を基準に。","ギフトやお礼には惜しまないで。","家計簿アプリに3分入力。","サブスクは一件だけ解約を検討。","買い物はメモに沿って。","臨時収入は貯蓄と経験に半分ずつ。","金運は“整頓”から始まる。","今日は見栄より実用。","中古市場を覗くと良い発見。","不要品はフリマへ。","値段より“寿命”で判断。","契約は小さな文字まで確認を。","現金の持ちすぎ注意。","小銭は貯金箱に移動。","外食は一回だけに。","感謝とともにお金を巡らせよう。"]},
+  "健康":{a:["姿勢リセットで","白湯または常温水で","歩数を少し増やすと","軽いストレッチで","就寝前にスマホを離して","タンパク質を意識して","外の空気に触れて","短い小休止で","風呂上がりの水分補給で","湯船に浸かって","肩と首を回して","ストレッチ5分で","食後の軽い散歩で","呼吸を整えて","寝る前の深呼吸で","体を温める食事で","冷たい飲み物を避けて","日光を浴びて","塩風呂で","足首を温めて","お腹と背中を守って","早寝早起きで","ツボ押しで","体を動かして","机の高さ調整で","甘いものは午前にして","カフェインを控えて","短時間運動でも続けて","旬の食材で","姿勢を伸ばして","加湿と保温で","無理せず休息をとり","目を休めて遠くを見て","蒸しタオルで温めて","朝の白湯で","水を飲むたび深呼吸で","衣服調整を意識して","早めのケアで","よく笑って"],
+    b:["集中が戻る。","代謝が整う。","体が軽くなる。","血流が良くなる。","睡眠の質が上がる。","安定する。","気分が切り替わる。","脳が休まる。","脱水を防げる。","疲労回復が進む。","肩こり対策に。","安眠に近づく。","消化を助ける。","心拍が落ち着く。","一日の疲れを手放せる。","体温が保てる。","リズムが整う。","メンタルが上向く。","リラックス効果◎。","全身がほぐれる。","冷え対策に。","体内時計が整う。","コリが和らぐ。","気持ちも整う。","負担が減る。","血糖値の急上昇を抑える。","睡眠を邪魔しない。","成果が見える。","自然と整う。","呼吸が深くなる。","乾燥対策に。","体力温存に。","目の負担軽減に。","巡りが良くなる。","代謝アップに。","意識が整う。","体調を崩しにくい。","不調の芽を摘める。","免疫が上がる。"],
+    c:["今日は“頑張りすぎない”が鍵。","無理のない範囲でOK。","こまめに水分を。","1時間に一度は立ち上がろう。","入浴後の保湿も忘れずに。","深呼吸から始めよう。","小さな積み重ねで十分。","体を温める食材を選んで。","少し早めに休もう。","目を閉じて30秒の休息を。","ストレッチは反動をつけないこと。","今日は“背中”を労わって。","味噌汁やスープを添えて。","人混みではマスクも選択肢。","靴を履き替えると歩きやすい。","体調が乱れたら予定を軽くして。","笑うことを意識して。","ゆっくり食べよう。","作業の合間に肩を回そう。","寝室を少し暗くして。"]}
+};
+
+function composeLineWithRng(topic, rng){
+  const bank=BANK[topic]; if(!bank) return '';
+  const a=bank.a[Math.floor(rng()*bank.a.length)];
+  const b=bank.b[Math.floor(rng()*bank.b.length)];
+  const c=bank.c[Math.floor(rng()*bank.c.length)];
+  return `${a}${b}${c}`;
+}
+
+
+function uniqueTwoLines(topic, seedStr){
+  const s1 = composeLineWithRng(topic, makeRng(stableSeed(seedStr+'|1')));
+  let s2 = composeLineWithRng(topic, makeRng(stableSeed(seedStr+'|2')));
+  if (s2 === s1) {
+    s2 = composeLineWithRng(topic, makeRng(stableSeed(seedStr+'|3')));
+    if (s2 === s1) {
+      s2 = s2.replace('。','！');
+      if (s2 === s1) s2 = '今は“丁寧に一歩”。無理なく進めば十分。';
+    }
+  }
+  return [s1, s2];
+}
+
+async function runHoroscope(){
+  saveInputs();
+  const birth=$('birthDate').value; if(!birth){alert('生年月日を入力してください。');return;}
+  const latStr=(($('lat').value||'').trim()||'0'); const lonStr=(($('lon').value||'').trim()||'0');
+  const lat=parseFloat(latStr), lon=parseFloat(lonStr); if(isNaN(lat)||isNaN(lon)){alert('緯度経度が無効です。');return;}
+  const tDate=$('targetDate')?.value||''; const dateStr=tDate?tDate:new Date().toISOString().split('T')[0];
+  const place=($('placeName').value||'').trim();
+
+  const seedStr=['v52-2',birth,dateStr,place.toLowerCase(),
+    Number.isFinite(lat)?lat.toFixed(4):'0.0000',
+    Number.isFinite(lon)?lon.toFixed(4):'0.0000'].join('|');
+  const baseSeed = stableSeed(seedStr);
+  const rng = makeRng(baseSeed);
+
+  // Local-safe birthday detection (avoid UTC parsing issues)
+const [by,bm,bd2] = (birth||'').split('-').map(v=>parseInt(v,10));
+const [ty,tm,td] = (dateStr||'').split('-').map(v=>parseInt(v,10));
+const today = new Date();
+
+// 指定日の占いが誕生日か（UI上の強調に使用、紙吹雪は使わない）
+const isBirthday = (tm === bm && td === bd2);
+
+// 今日が誕生日か（紙吹雪のシークレットトリガー）
+const isTodayBirthday = ((today.getMonth()+1) === bm && today.getDate() === bd2);
+
+  const ctx={}; ctx.seasonNews=await fetchNewsAndSeasonContext(dateStr);
+
+  const jd = toJD(new Date(dateStr+'T12:00:00'));
+  const sunLon = sunLongitudeDeg(jd);
+  const moonLon = moonLongitudeDeg(jd);
+  const mercLon = planetLongitudeDeg(jd, "Mercury");
+  const venusLon = planetLongitudeDeg(jd, "Venus");
+  const marsLon = planetLongitudeDeg(jd, "Mars");
+  const jupiterLon = planetLongitudeDeg(jd, "Jupiter");
+  const saturnLon = planetLongitudeDeg(jd, "Saturn");
+
+  const planets = [
+    { name:"Sun", lonDeg:sunLon, weight:1.0 },
+    { name:"Moon", lonDeg:moonLon, weight:1.0 },
+    { name:"Mercury", lonDeg:mercLon, weight:0.6 },
+    { name:"Venus", lonDeg:venusLon, weight:0.8 },
+    { name:"Mars", lonDeg:marsLon, weight:0.8 },
+    { name:"Jupiter", lonDeg:jupiterLon, weight:0.7 },
+    { name:"Saturn", lonDeg:saturnLon, weight:0.7 }
+  ];
+
+  const angleResult = computeAngleOnlyScore(planets);
+  const base = angleResult.score;
+
+  const topics=['全体運','恋愛','仕事','金運','健康'];
+  const perTopic=2;
+
+  let html=`<div class="muted">${ctx.seasonNews}</div>`;
+  for(const t of topics){
+    const jitter = Math.floor(rng()*7)-3;
+    const tweak  = TOPIC_TWEAK[t]||0;
+    let pct = Math.round(Math.max(1, Math.min(98, base + jitter + tweak + (isBirthday?5:0))));
+
+    const topicSeed = stableSeed(seedStr+'|'+t);
+    const trng = makeRng(topicSeed);
+    const [l1, l2] = uniqueTwoLines(t, seedStr+'|'+t);
+
+    html+=`<div class="card">
+      <div class="row">
+        <div class="title">${t}</div>
+        <div class="score"><div class="bar"><div class="bar-fill" style="width:${pct}%;"></div></div><span class="pct">${pct}%</span></div>
+      </div>
+      ${'• '+escapeHtml(l1)}<br>${'• '+escapeHtml(l2)}
+    </div>`;
+  }
+  if(isBirthday){
+    html+=`<div class="card birthday"><strong>🎂 お誕生日おめでとうございます！</strong><br>すてきな一年になりますように。</div>`;
+  }
+
+  $('resultContainer').innerHTML=html;
+  $('inputArea').style.display='none'; $('outputArea').style.display='block';
+
+  if(isTodayBirthday){ requestAnimationFrame(()=>requestAnimationFrame(()=>triggerConfetti(5500,90))); }
+}
+
+function triggerConfetti(durationMs=5000,count=80){
+  const cvs=$('confettiCanvas'); if(!cvs) return; const ctx=cvs.getContext('2d');
+  const DPR=Math.max(1,Math.floor(window.devicePixelRatio||1));
+  function resize(){cvs.style.display='block'; cvs.width=innerWidth*DPR; cvs.height=innerHeight*DPR;} resize();
+  const colors=['#6b46c1','#b794f4','#ffd166','#ffffff','#ff6b6b']; const pcs=[];
+  for(let i=0;i<count;i++){pcs.push({x:Math.random()*cvs.width,y:-Math.random()*cvs.height*0.5,w:(6+Math.random()*8)*DPR,h:(3+Math.random()*5)*DPR,vx:(Math.random()*2-1)*0.6*DPR,vy:(1.2+Math.random()*2.0)*DPR,rot:Math.random()*Math.PI,vr:(Math.random()*2-1)*0.1,color:colors[i%colors.length],alpha:1});}
+  const start=performance.now();
+  function step(t){const e=t-start; ctx.clearRect(0,0,cvs.width,cvs.height);
+    const fade=Math.min(1,Math.max(0,(e-durationMs*0.7)/(durationMs*0.3)));
+    for(const p of pcs){p.x+=p.vx+Math.sin((p.y+e*0.002))*0.4*DPR; p.y+=p.vy; p.rot+=p.vr; p.alpha=Math.max(0,1-fade);
+      ctx.save(); ctx.globalAlpha=p.alpha; ctx.translate(p.x,p.y); ctx.rotate(p.rot); ctx.fillStyle=p.color; ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h); ctx.restore();
+      if(p.y>cvs.height+40*DPR){p.y=-20*DPR;}
+    }
+    if(e<durationMs) requestAnimationFrame(step); else {ctx.clearRect(0,0,cvs.width,cvs.height); cvs.style.display='none';}
+  }
+  requestAnimationFrame(step);
+}
+
+function backToInput(){
+  const cvs = document.getElementById('confettiCanvas');
+  if (cvs) {
+    const ctx = cvs.getContext('2d');
+    try { ctx && ctx.clearRect(0,0,cvs.width,cvs.height); } catch(_){}
+    cvs.style.display='none';
+  }
+  document.getElementById('outputArea').style.display='none';
+  document.getElementById('inputArea').style.display='block';
+  window.scrollTo({top:0,left:0,behavior:'instant'});
+  setTimeout(()=>{ document.getElementById('birthDate')?.focus(); }, 0);
+}
+
+async function onGeocodeClick(){
+  const q=($('placeName').value||'').trim();
+  if(!q){alert('都市名を入力してください。');return;}
+  const alias=snapToPresetIfAlias(q);
+  if(alias){$('lat').value=alias.lat;$('lon').value=alias.lon;saveInputs();toast(`${q} を東京の代表点に固定しました`);return;}
+  try{
+    toast('位置検索中…');
+    const url='https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(q);
+    const r=await fetch(url,{headers:{'Accept':'application/json'}}); if(!r.ok) throw new Error('HTTP '+r.status);
+    const j=await r.json(); if(!j||!j.length){alert('見つかりませんでした。'); return;}
+    let lat=String(j[0].lat), lon=String(j[0].lon); const near=snapNearPreset(lat,lon,15); if(near){lat=near.lat;lon=near.lon;}
+    $('lat').value=lat; $('lon').value=lon; saveInputs(); toast('座標を設定しました');
+  }catch(e){ alert('位置取得に失敗: '+(e.message||e)); }
+}
+
+let _h2c=null;
+function loadHtml2Canvas(){ if(_h2c) return _h2c; _h2c=new Promise((ok,ng)=>{const s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js'; s.onload=()=>ok(); s.onerror=()=>ng(new Error('html2canvas load error')); document.head.appendChild(s);}); return _h2c; }
+function ts(){const d=new Date(); const p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}`;}
+async function saveAsJPEG(){
+  try{
+    await loadHtml2Canvas();
+    const node=$('resultContainer');
+    const canvas=await html2canvas(node,{backgroundColor:'#ffffff',scale:2});
+    const url=canvas.toDataURL('image/jpeg',0.92);
+    const a=document.createElement('a'); a.href=url;
+    const bd=$('birthDate').value||'unknown'; const bt=($('birthTime').value||'00:00').replace(':','-');
+    const t=$('targetDate')?.value||''; const tag=t?('_'+t):'';
+    a.download=`horoscope_${ts()}${tag}_${bd}_${bt}.jpg`;
+    a.click(); toast('JPEGを保存しました');
+  }catch(e){ alert('保存に失敗: '+(e.message||e)); }
+}
+
+function wireBack(){
+  const b = document.getElementById('backBtn');
+  const goBack = (e)=>{ e?.preventDefault?.(); backToInput(); };
+  ['click','touchend'].forEach(ev=> b.addEventListener(ev, goBack, {passive:true}));
+  window.addEventListener('keydown', (e)=>{
+    if (document.getElementById('outputArea').style.display==='block') {
+      if (e.key === 'Escape') goBack(e);
+      if (e.key === 'Enter' && (e.target===b)) goBack(e);
+    }
+  });
+}
+
+function init(){
+  loadInputs();
+  $('geoBtn').addEventListener('click', onGeocodeClick);
+  $('runBtn').addEventListener('click', runHoroscope);
+  $('backBtn').addEventListener('click', backToInput);
+  wireBack();
+  $('saveBtn').addEventListener('click', saveAsJPEG);
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('/horoscope-100pct-2/sw.js?v=v2-1', { scope: '/horoscope-100pct-2/' })
+      .catch(console.error);
+  }
+}
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
