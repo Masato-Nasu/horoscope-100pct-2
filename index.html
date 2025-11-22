@@ -6,8 +6,9 @@
 <title>100% 星占い 2</title>
 <meta name="theme-color" content="#060812">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="apple-touch-icon" href="/horoscope-100pct-2/icon-192.png">
+<link rel="apple-touch-icon" href="/horoscope-100pct-2/icon-180.png">
 <link rel="manifest" href="/horoscope-100pct-2/manifest.json">
 
 <!-- v52.1 -->
@@ -18,10 +19,10 @@
 
 <style>
 body{font-family:'Noto Sans JP',system-ui,-apple-system,sans-serif;background:#fafafa;color:#222;margin:0;text-align:center}
-header{background:#060812;color:#fff;padding:1.2em 0;font-weight:700;font-size:1.3em}
+header{background:#6b46c1;color:#fff;padding:1.2em 0;font-weight:700;font-size:1.3em}
 main{padding:1.2em;max-width:720px;margin:0 auto}
 input,button{font:inherit;padding:.6em;border-radius:.6em;border:1px solid #ccc;box-sizing:border-box;width:100%}
-button{background:#060812;color:#fff;border:none;cursor:pointer} button:hover{opacity:.9}
+button{background:#6b46c1;color:#fff;border:none;cursor:pointer} button:hover{opacity:.9}
 .card{background:#fff;border-radius:1em;box-shadow:0 2px 8px rgba(0,0,0,.08);padding:1.1em;margin-top:1em;text-align:left}
 .muted{color:#666;font-size:.9em}
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:10px 16px;border-radius:999px;opacity:0;transition:opacity .25s}
@@ -31,8 +32,8 @@ button{background:#060812;color:#fff;border:none;cursor:pointer} button:hover{op
 .card .title{font-weight:700}
 .score{display:flex;align-items:center;gap:8px;min-width:180px;margin-left:auto}
 .bar{position:relative;flex:1;height:8px;background:#eee;border-radius:999px;overflow:hidden}
-.bar-fill{position:absolute;inset:0 100% 0 0;background:#060812;border-radius:999px;transition:width .6s ease}
-.pct{font-weight:700;color:#8b92e8;min-width:3ch;text-align:right}
+.bar-fill{position:absolute;inset:0 100% 0 0;background:#6b46c1;border-radius:999px;transition:width .6s ease}
+.pct{font-weight:700;color:#4a3ba5;min-width:3ch;text-align:right}
 .card.birthday{border:2px solid #f5b5d5}
 #confettiCanvas{position:fixed;inset:0;pointer-events:none;z-index:9999}
 </style>
@@ -134,7 +135,7 @@ function moonLongitudeDeg(jd){
   return norm360(lon);
 }
 
-// ===== Angle-Only Hardcore Engine (Multi-Planet) v2-1 =====
+// ===== Angle-Only Hardcore Engine (Multi-Planet) v3-3 =====
 const ASPECTS = [
   { name:"Conjunction", angle:0,   orb:8,   impact:+0.60 },
   { name:"Semi-sextile",angle:30,  orb:2,   impact:+0.20 },
@@ -207,9 +208,8 @@ function computeAngleOnlyScore(planets){
 }
 
 // ===== Simplified planetary longitudes (low-precision) =====
-// Based on low-precision orbital elements (adequate for daily horoscope tone).
 function planetLongitudeDeg(jd, name){
-  const d = jd - 2451545.0; // days since J2000
+  const d = jd - 2451545.0;
   const rad = Math.PI/180;
   function norm360(x){ x%=360; if(x<0) x+=360; return x; }
   function kepler(M,e){
@@ -219,51 +219,24 @@ function planetLongitudeDeg(jd, name){
     }
     return E;
   }
-  // elements: N, i, w, a, e, M (all in degrees except a,e)
   let N,i,w,a,e,M;
   switch(name){
     case "Mercury":
-      N = 48.3313 + 3.24587E-5*d;
-      i = 7.0047 + 5.00E-8*d;
-      w = 29.1241 + 1.01444E-5*d;
-      a = 0.387098;
-      e = 0.205635 + 5.59E-10*d;
-      M = 168.6562 + 4.0923344368*d;
-      break;
+      N = 48.3313 + 3.24587E-5*d; i = 7.0047 + 5.00E-8*d; w = 29.1241 + 1.01444E-5*d;
+      a = 0.387098; e = 0.205635 + 5.59E-10*d; M = 168.6562 + 4.0923344368*d; break;
     case "Venus":
-      N = 76.6799 + 2.46590E-5*d;
-      i = 3.3946 + 2.75E-8*d;
-      w = 54.8910 + 1.38374E-5*d;
-      a = 0.723330;
-      e = 0.006773 - 1.302E-9*d;
-      M = 48.0052 + 1.6021302244*d;
-      break;
+      N = 76.6799 + 2.46590E-5*d; i = 3.3946 + 2.75E-8*d; w = 54.8910 + 1.38374E-5*d;
+      a = 0.723330; e = 0.006773 - 1.302E-9*d; M = 48.0052 + 1.6021302244*d; break;
     case "Mars":
-      N = 49.5574 + 2.11081E-5*d;
-      i = 1.8497 - 1.78E-8*d;
-      w = 286.5016 + 2.92961E-5*d;
-      a = 1.523688;
-      e = 0.093405 + 2.516E-9*d;
-      M = 18.6021 + 0.5240207766*d;
-      break;
+      N = 49.5574 + 2.11081E-5*d; i = 1.8497 - 1.78E-8*d; w = 286.5016 + 2.92961E-5*d;
+      a = 1.523688; e = 0.093405 + 2.516E-9*d; M = 18.6021 + 0.5240207766*d; break;
     case "Jupiter":
-      N = 100.4542 + 2.76854E-5*d;
-      i = 1.3030 - 1.557E-7*d;
-      w = 273.8777 + 1.64505E-5*d;
-      a = 5.20256;
-      e = 0.048498 + 4.469E-9*d;
-      M = 19.8950 + 0.0830853001*d;
-      break;
+      N = 100.4542 + 2.76854E-5*d; i = 1.3030 - 1.557E-7*d; w = 273.8777 + 1.64505E-5*d;
+      a = 5.20256; e = 0.048498 + 4.469E-9*d; M = 19.8950 + 0.0830853001*d; break;
     case "Saturn":
-      N = 113.6634 + 2.38980E-5*d;
-      i = 2.4886 - 1.081E-7*d;
-      w = 339.3939 + 2.97661E-5*d;
-      a = 9.55475;
-      e = 0.055546 - 9.499E-9*d;
-      M = 316.9670 + 0.0334442282*d;
-      break;
-    default:
-      return 0;
+      N = 113.6634 + 2.38980E-5*d; i = 2.4886 - 1.081E-7*d; w = 339.3939 + 2.97661E-5*d;
+      a = 9.55475; e = 0.055546 - 9.499E-9*d; M = 316.9670 + 0.0334442282*d; break;
+    default: return 0;
   }
   N=norm360(N); i=norm360(i); w=norm360(w); M=norm360(M);
   const E = kepler(M,e);
@@ -424,6 +397,84 @@ function uniqueTwoLines(topic, seedStr){
 }
 
 
+async function runHoroscope(){
+  saveInputs();
+  const birth=$('birthDate').value; if(!birth){alert('生年月日を入力してください。');return;}
+  const latStr=(($('lat').value||'').trim()||'0'); const lonStr=(($('lon').value||'').trim()||'0');
+  const lat=parseFloat(latStr), lon=parseFloat(lonStr); if(isNaN(lat)||isNaN(lon)){alert('緯度経度が無効です。');return;}
+  const tDate=$('targetDate')?.value||''; const dateStr=tDate?tDate:new Date().toISOString().split('T')[0];
+  const place=($('placeName').value||'').trim();
+
+  const seedStr=['v52-2',birth,dateStr,place.toLowerCase(),
+    Number.isFinite(lat)?lat.toFixed(4):'0.0000',
+    Number.isFinite(lon)?lon.toFixed(4):'0.0000'].join('|');
+  const baseSeed = stableSeed(seedStr);
+  const rng = makeRng(baseSeed);
+
+  // Local-safe birthday detection (avoid UTC parsing issues)
+const [by,bm,bd2] = (birth||'').split('-').map(v=>parseInt(v,10));
+const [ty,tm,td] = (dateStr||'').split('-').map(v=>parseInt(v,10));
+const today = new Date();
+
+// 指定日の占いが誕生日か（UI上の強調に使用、紙吹雪は使わない）
+const isBirthday = (tm === bm && td === bd2);
+
+// 今日が誕生日か（紙吹雪のシークレットトリガー）
+const isTodayBirthday = ((today.getMonth()+1) === bm && today.getDate() === bd2);
+
+  const ctx={}; ctx.seasonNews=await fetchNewsAndSeasonContext(dateStr);
+
+  const ang=sunMoonElongationDeg(sunLon, moonLon);
+  const mercLon = planetLongitudeDeg(jd, "Mercury");
+  const venusLon = planetLongitudeDeg(jd, "Venus");
+  const marsLon = planetLongitudeDeg(jd, "Mars");
+  const jupiterLon = planetLongitudeDeg(jd, "Jupiter");
+  const saturnLon = planetLongitudeDeg(jd, "Saturn");
+
+  const planets = [
+    { name:"Sun", lonDeg:sunLon, weight:1.0 },
+    { name:"Moon", lonDeg:moonLon, weight:1.0 },
+    { name:"Mercury", lonDeg:mercLon, weight:0.6 },
+    { name:"Venus", lonDeg:venusLon, weight:0.8 },
+    { name:"Mars", lonDeg:marsLon, weight:0.8 },
+    { name:"Jupiter", lonDeg:jupiterLon, weight:0.7 },
+    { name:"Saturn", lonDeg:saturnLon, weight:0.7 }
+  ];
+
+  const angleResult = computeAngleOnlyScore(planets);
+  const base = angleResult.score;
+
+  const topics=['全体運','恋愛','仕事','金運','健康'];
+  const perTopic=2;
+
+  let html=`<div class="muted">${ctx.seasonNews}</div>`;
+  for(const t of topics){
+    const jitter = Math.floor(rng()*7)-3;
+    const tweak  = TOPIC_TWEAK[t]||0;
+    let pct = Math.round(Math.max(1, Math.min(98, base + jitter + tweak + (isBirthday?5:0))));
+
+    const topicSeed = stableSeed(seedStr+'|'+t);
+    const trng = makeRng(topicSeed);
+    const [l1, l2] = uniqueTwoLines(t, seedStr+'|'+t);
+
+    html+=`<div class="card">
+      <div class="row">
+        <div class="title">${t}</div>
+        <div class="score"><div class="bar"><div class="bar-fill" style="width:${pct}%;"></div></div><span class="pct">${pct}%</span></div>
+      </div>
+      ${'• '+escapeHtml(l1)}<br>${'• '+escapeHtml(l2)}
+    </div>`;
+  }
+  if(isBirthday){
+    html+=`<div class="card birthday"><strong>🎂 お誕生日おめでとうございます！</strong><br>すてきな一年になりますように。</div>`;
+  }
+
+  $('resultContainer').innerHTML=html;
+  $('inputArea').style.display='none'; $('outputArea').style.display='block';
+
+  if(isTodayBirthday){ requestAnimationFrame(()=>requestAnimationFrame(()=>triggerConfetti(5500,90))); }
+}
+
 function triggerConfetti(durationMs=5000,count=80){
   const cvs=$('confettiCanvas'); if(!cvs) return; const ctx=cvs.getContext('2d');
   const DPR=Math.max(1,Math.floor(window.devicePixelRatio||1));
@@ -507,7 +558,7 @@ function init(){
   wireBack();
   $('saveBtn').addEventListener('click', saveAsJPEG);
   if('serviceWorker' in navigator){
-    navigator.serviceWorker.register('/horoscope-100pct-2/sw.js?v=v2-1', { scope: '/horoscope-100pct-2/' })
+    navigator.serviceWorker.register('/horoscope-100pct-2/sw.js?v=52-2', { scope: '/horoscope-100pct-2/' })
       .catch(console.error);
   }
 }
