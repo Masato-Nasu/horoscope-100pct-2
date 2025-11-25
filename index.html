@@ -169,14 +169,6 @@ function angleBaseScore(angle){
   return score;
 }
 const TOPIC_TWEAK={'全体運':0,'恋愛':3,'仕事':0,'金運':-2,'健康':1};
-function birthdayTopicOffset(birth, topic){
-  if(!birth) return 0;
-  const seed = stableSeed('b3|'+birth+'|'+topic);
-  const brng = makeRng(seed);
-  // -14〜+14 の整数オフセット
-  return Math.floor(brng()*29)-14;
-}
-
 
 function stableSeed(str){ let h=0; for(let i=0;i<str.length;i++){ h=(Math.imul(31,h) + str.charCodeAt(i))|0; } return (h>>>0); }
 function makeRng(seed){ let t=seed>>>0; return function(){ t|=0; t=(t+0x6D2B79F5)|0; let r=Math.imul(t ^ (t>>>15), 1|t); r^=r + Math.imul(r ^ (r>>>7), 61|r); return ((r ^ (r>>>14))>>>0) / 4294967296; } }
@@ -229,7 +221,7 @@ async function runHoroscope(){
   const tDate=$('targetDate')?.value||''; const dateStr=tDate?tDate:new Date().toISOString().split('T')[0];
   const place=($('placeName').value||'').trim();
 
-  const seedStr=['v53-0',birth,dateStr,place.toLowerCase(),
+  const seedStr=['v52-2',birth,dateStr,place.toLowerCase(),
     Number.isFinite(lat)?lat.toFixed(4):'0.0000',
     Number.isFinite(lon)?lon.toFixed(4):'0.0000'].join('|');
   const baseSeed = stableSeed(seedStr);
@@ -258,8 +250,7 @@ const isTodayBirthday = ((today.getMonth()+1) === bm && today.getDate() === bd2)
   for(const t of topics){
     const jitter = Math.floor(rng()*7)-3;
     const tweak  = TOPIC_TWEAK[t]||0;
-    const birthOffset = birthdayTopicOffset(birth, t);
-    let pct = Math.round(Math.max(1, Math.min(98, base + jitter + tweak + birthOffset + (isBirthday?7:0))));
+    let pct = Math.round(Math.max(1, Math.min(98, base + jitter + tweak + (isBirthday?5:0))));
 
     const topicSeed = stableSeed(seedStr+'|'+t);
     const trng = makeRng(topicSeed);
