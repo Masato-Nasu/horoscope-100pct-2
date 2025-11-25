@@ -1,16 +1,16 @@
-/* sw.js v52-2 */
-const CACHE_VERSION = 'v52-2';
+/* sw.js v53-0 */
+const CACHE_VERSION = 'v53-0';
 const APP_CACHE = 'horoscope-' + CACHE_VERSION;
 const ASSETS = [
-  '/horoscope-100pct/',
-  '/horoscope-100pct/index.html?v=52-2',
-  '/horoscope-100pct/manifest.json',
-  '/horoscope-100pct/icon-192.png',
-  '/horoscope-100pct/icon-512.png',
-  '/horoscope-100pct/icon-180.png',
-  '/horoscope-100pct/splash.css',
-  '/horoscope-100pct/splash.js',
-  '/horoscope-100pct/favicon.svg'
+  '/horoscope-100pct-2/',
+  '/horoscope-100pct-2/index.html?v=53-0',
+  '/horoscope-100pct-2/manifest.json',
+  '/horoscope-100pct-2/icon-192.png',
+  '/horoscope-100pct-2/icon-512.png',
+  '/horoscope-100pct-2/icon-180.png',
+  '/horoscope-100pct-2/splash.css',
+  '/horoscope-100pct-2/splash.js',
+  '/horoscope-100pct-2/favicon.svg'
 ];
 
 self.addEventListener('install', e => {
