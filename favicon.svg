@@ -1,4 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
-<rect width="120" height="120" rx="20" fill="#060812"/>
-<text x="60" y="72" text-anchor="middle" font-size="56" font-family="Helvetica, Arial, sans-serif" font-weight="700" fill="#f5f5fa">100%</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff4eb0"/>
+      <stop offset="1" stop-color="#a24efc"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="256" height="256" fill="#6b46c1"/>
+  <path d="M128 210c-4 0-8-2-11-5l-63-63c-21-21-21-55 0-76 10-10 24-16 38-16s28 6 38 16c10-10 24-16 38-16s28 6 38 16c21 21 21 55 0 76l-63 63c-3 3-7 5-11 5z" fill="url(#g)" filter="url(#glow)"/>
 </svg>
