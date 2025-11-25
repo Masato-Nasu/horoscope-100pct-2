@@ -222,7 +222,7 @@ async function runHoroscope(){
   const tDate=$('targetDate')?.value||''; const dateStr=tDate?tDate:new Date().toISOString().split('T')[0];
   const place=($('placeName').value||'').trim();
 
-  const seedStr=['v52-2',birth,dateStr,place.toLowerCase(),
+  const seedStr=['v53-1',birth,dateStr,place.toLowerCase(),
     Number.isFinite(lat)?lat.toFixed(4):'0.0000',
     Number.isFinite(lon)?lon.toFixed(4):'0.0000'].join('|');
   const baseSeed = stableSeed(seedStr);
@@ -244,6 +244,15 @@ const isTodayBirthday = ((today.getMonth()+1) === bm && today.getDate() === bd2)
   const ang=sunMoonElongationDeg(new Date(dateStr+'T12:00:00'));
   const base=angleBaseScore(ang);
 
+  // 誕生日ごとのトーン（各ジャンルに±45%までの差をつける：生まれつきの得意・不得意を強く反映）
+  const birthOffsets={};
+  for(const t of ['全体運','恋愛','仕事','金運','健康']){
+    const bSeed = stableSeed('birthTopic|'+birth+'|'+t);
+    const brng  = makeRng(bSeed);
+    const raw   = (brng()*2-1); // -1..1
+    birthOffsets[t] = Math.round(raw*45); // -45〜+45%
+  }
+
   const topics=['全体運','恋愛','仕事','金運','健康'];
   const perTopic=2;
 
@@ -251,7 +260,8 @@ const isTodayBirthday = ((today.getMonth()+1) === bm && today.getDate() === bd2)
   for(const t of topics){
     const jitter = Math.floor(rng()*7)-3;
     const tweak  = TOPIC_TWEAK[t]||0;
-    let pct = Math.round(Math.max(1, Math.min(98, base + jitter + tweak + (isBirthday?5:0))));
+    const birthShift = birthOffsets[t]||0;
+    let pct = Math.round(Math.max(1, Math.min(100, base + jitter + tweak + birthShift + (isBirthday?5:0))));
 
     const topicSeed = stableSeed(seedStr+'|'+t);
     const trng = makeRng(topicSeed);
@@ -358,7 +368,7 @@ function init(){
   wireBack();
   $('saveBtn').addEventListener('click', saveAsJPEG);
   if('serviceWorker' in navigator){
-    navigator.serviceWorker.register('/horoscope-100pct-2/sw.js?v=52-2', { scope: '/horoscope-100pct-2/' })
+    navigator.serviceWorker.register('/horoscope-100pct-2/sw.js?v=53-0', { scope: '/horoscope-100pct-2/' })
       .catch(console.error);
   }
 }
