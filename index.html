@@ -6,15 +6,16 @@
 <title>100% 星占い</title>
 <meta name="theme-color" content="#6b46c1">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="apple-touch-icon" href="/horoscope-100pct/icon-180.png">
-<link rel="manifest" href="/horoscope-100pct/manifest.json">
+<link rel="apple-touch-icon" href="/horoscope-100pct-2/icon-180.png">
+<link rel="manifest" href="/horoscope-100pct-2/manifest.json">
 
 <!-- v52.1 -->
-<link rel="icon" href="/horoscope-100pct/favicon.svg" type="image/svg+xml">
-<link rel="preload" href="/horoscope-100pct/splash.css" as="style">
-<link rel="stylesheet" href="/horoscope-100pct/splash.css">
-<script defer src="/horoscope-100pct/splash.js"></script>
+<link rel="icon" href="/horoscope-100pct-2/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/horoscope-100pct-2/splash.css" as="style">
+<link rel="stylesheet" href="/horoscope-100pct-2/splash.css">
+<script defer src="/horoscope-100pct-2/splash.js"></script>
 
 <style>
 body{font-family:'Noto Sans JP',system-ui,-apple-system,sans-serif;background:#fafafa;color:#222;margin:0;text-align:center}
@@ -40,7 +41,7 @@ button{background:#6b46c1;color:#fff;border:none;cursor:pointer} button:hover{op
 <body>
 <!-- Splash overlay (v49) -->
 <div id="app-splash" role="status" aria-live="polite">
-  <img class="logo" src="/horoscope-100pct/icon-192.png" alt="">
+  <img class="logo" src="/horoscope-100pct-2/icon-192.png" alt="">
   <div class="title">100% 星占い</div>
   <div class="sub">Starting…</div>
 </div>
@@ -357,7 +358,7 @@ function init(){
   wireBack();
   $('saveBtn').addEventListener('click', saveAsJPEG);
   if('serviceWorker' in navigator){
-    navigator.serviceWorker.register('/horoscope-100pct/sw.js?v=52-2', { scope: '/horoscope-100pct/' })
+    navigator.serviceWorker.register('/horoscope-100pct-2/sw.js?v=52-2', { scope: '/horoscope-100pct-2/' })
       .catch(console.error);
   }
 }
